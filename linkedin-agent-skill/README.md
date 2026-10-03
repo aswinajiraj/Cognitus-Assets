@@ -175,3 +175,9 @@ The full write-up is at [opusjake.ai/r/linkedin-agent](https://opusjake.ai/r/lin
 ## License
 
 MIT. Take it, change it, ship it.
+
+## Mundus Cognitus edition
+
+This copy ships with `templates/voice.mundus.md`, a filled-in voice file for
+Mundus Cognitus AI Studio (no em dashes, English only, tool canon, content
+pillars, sign-off). Copy it to `~/.claude/linkedin/voice.md` to use it.
