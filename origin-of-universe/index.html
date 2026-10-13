@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Origin of the Universe — 60s</title>
+<style>
+  :root { --bg:#030308; --fg:#f8fafc; --acc:#38bdf8; }
+  * { box-sizing:border-box; margin:0; }
+  html,body { width:100%; height:100%; background:var(--bg); color:var(--fg); font-family:system-ui,sans-serif; overflow:hidden; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
+  .vig { position:absolute; inset:0; box-shadow:inset 0 0 140px rgba(0,0,0,.85); pointer-events:none; }
+  #hud { position:absolute; top:16px; left:16px; right:16px; display:flex; justify-content:space-between; gap:12px; font:12px ui-monospace,monospace; letter-spacing:.08em; text-transform:uppercase; pointer-events:none; }
+  #hud div { background:rgba(0,0,0,.45); border:1px solid rgba(255,255,255,.12); border-radius:10px; padding:8px 12px; backdrop-filter:blur(6px); }
+  #hud b { color:var(--acc); font-weight:600; }
+  #caption { position:absolute; left:16px; right:16px; bottom:96px; max-width:760px; }
+  #stage { font:11px ui-monospace,monospace; color:var(--acc); letter-spacing:.12em; margin-bottom:6px; }
+  #title { font-size:clamp(28px,6vw,60px); font-weight:700; letter-spacing:-.02em; line-height:1; text-shadow:0 0 30px rgba(56,189,248,.45); margin-bottom:10px; }
+  #sub { font-size:clamp(14px,2vw,18px); line-height:1.5; color:#cbd5e1; background:rgba(0,0,0,.4); border-radius:12px; padding:10px 14px; }
+  #bar { position:absolute; left:16px; right:16px; bottom:16px; display:flex; align-items:center; gap:10px; background:rgba(2,6,23,.8); border:1px solid rgba(255,255,255,.15); border-radius:14px; padding:10px 12px; }
+  button { background:rgba(255,255,255,.1); color:var(--fg); border:0; border-radius:10px; height:36px; padding:0 12px; font:12px ui-monospace,monospace; cursor:pointer; }
+  button:hover { background:rgba(255,255,255,.2); }
+  #play { background:var(--acc); color:#020617; font-weight:700; width:44px; }
+  input[type=range] { flex:1; accent-color:var(--acc); }
+  #time { font:12px ui-monospace,monospace; white-space:nowrap; }
+  #start { position:absolute; inset:0; z-index:10; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; background:radial-gradient(circle,#0b0c18,#030308); text-align:center; padding:24px; }
+  #start h1 { font-size:clamp(28px,6vw,56px); letter-spacing:-.02em; }
+  #start p { color:#94a3b8; max-width:420px; }
+  #start button { background:var(--acc); color:#020617; font-weight:700; height:48px; padding:0 28px; font-size:14px; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="vig"></div>
+
+<div id="hud">
+  <div>Chronos // <b>Origin of the Universe</b></div>
+  <div>T <b id="hT">∞ K</b> · Scale <b id="hS">10⁻³⁵ m</b></div>
+</div>
+
+<div id="caption">
+  <div id="stage"></div>
+  <h2 id="title"></h2>
+  <p id="sub"></p>
+</div>
+
+<div id="bar">
+  <button id="play">❚❚</button>
+  <button id="restart" title="Restart">↺</button>
+  <button id="mute">🔊 ON</button>
+  <input id="scrub" type="range" min="0" max="60" step="0.01" value="0" aria-label="Timeline">
+  <span id="time">00.0 / 60</span>
+</div>
+
+<div id="start">
+  <h1>The Origin of the Universe</h1>
+  <p>60 seconds · animation, synthesized sound effects and AI narration. Turn your sound on.</p>
+  <button id="go">▶ BEGIN</button>
+</div>
+
+<script>
+/* ---------- Timeline data ---------- */
+const DURATION = 60;
+const STAGES = [
+  { s:0,  e:8,  title:"THE SINGULARITY", sub:"Before time and space, everything that would ever exist was compressed into a single point.", temp:"10³² K", scale:"10⁻³⁵ m" },
+  { s:8,  e:18, title:"THE BIG BANG", sub:"Space itself explodes faster than light, stretching quantum ripples across the newborn universe.", temp:"10²⁸ K", scale:"Inflating" },
+  { s:18, e:30, title:"QUARK SOUP", sub:"Quarks and gluons collide. Matter beats antimatter by one part in a billion.", temp:"10¹² K", scale:"1,000 ly" },
+  { s:30, e:40, title:"FIRST LIGHT", sub:"380,000 years on, atoms form and photons break free: the cosmic microwave background.", temp:"3,000 K", scale:"84 M ly" },
+  { s:40, e:50, title:"FIRST STARS", sub:"Gravity gathers hydrogen along dark-matter filaments and the first stars ignite.", temp:"60 K", scale:"3 B ly" },
+  { s:50, e:60.01, title:"GALAXIES", sub:"13.8 billion years later, galaxies spiral across the cosmic web, and consciousness looks back.", temp:"2.725 K", scale:"93 B ly" }
+];
+/* Narration clips (Fish Audio, voice "Adrian"). One per stage. */
+const NARRATION = [
+  "https://platform.r2.fish.audio/tasks/2026-10-13/b96e2af04125482fa0b991146cc6b7d1.mp3",
+  "https://platform.r2.fish.audio/tasks/2026-10-13/ab1261a764af45e393d39a4c97d8ce52.mp3",
+  "https://platform.r2.fish.audio/tasks/2026-10-13/d6eb17f13ccf4f3a84ca2d2526f43f48.mp3",
+  "https://platform.r2.fish.audio/tasks/2026-10-13/992b601106634b6ea26582e8da26637d.mp3",
+  "https://platform.r2.fish.audio/tasks/2026-10-13/01a35f4ebccf46e0b266b8f600bd0d94.mp3",
+  "https://platform.r2.fish.audio/tasks/2026-10-13/3768293764264095b277b5a43450fed0.mp3"
+];
+const NARR_OFFSET = 0.5; // seconds after each stage starts
+const voices = NARRATION.map(u => { const a = new Audio(); a.preload = "auto"; a.src = u; return a; });
+
+/* ---------- Audio engine (WebAudio synth SFX) ---------- */
+let ac, master, drone, droneGain, droneFilter, muted = false;
+function initAudio() {
+  if (ac) return;
+  ac = new (window.AudioContext || window.webkitAudioContext)();
+  master = ac.createGain(); master.gain.value = 0.8; master.connect(ac.destination);
+  droneFilter = ac.createBiquadFilter(); droneFilter.type = "lowpass"; droneFilter.frequency.value = 200;
+  droneGain = ac.createGain(); droneGain.gain.value = 0.0;
+  droneFilter.connect(droneGain).connect(master);
+  [55, 55.4, 82.4].forEach(f => { const o = ac.createOscillator(); o.type = "sawtooth"; o.frequency.value = f; o.connect(droneFilter); o.start(); });
+  drone = true;
+}
+function noiseBuf(sec) {
+  const b = ac.createBuffer(1, ac.sampleRate * sec, ac.sampleRate), d = b.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  return b;
+}
+function env(g, t, a, peak, rel) { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + rel); }
+const SFX = {
+  boom() { // Big Bang: sub drop + noise burst
+    const t = ac.currentTime;
+    const o = ac.createOscillator(), g = ac.createGain(); o.frequency.setValueAtTime(140, t); o.frequency.exponentialRampToValueAtTime(28, t + 2.5);
+    env(g, t, 0.02, 1.0, 3); o.connect(g).connect(master); o.start(t); o.stop(t + 3.2);
+    const n = ac.createBufferSource(); n.buffer = noiseBuf(2.5); const f = ac.createBiquadFilter(); f.type = "lowpass"; f.frequency.setValueAtTime(8000, t); f.frequency.exponentialRampToValueAtTime(120, t + 2);
+    const ng = ac.createGain(); env(ng, t, 0.01, 0.9, 2.2); n.connect(f).connect(ng).connect(master); n.start(t);
+  },
+  riser(dur = 7) { // tension build
+    const t = ac.currentTime, o = ac.createOscillator(), g = ac.createGain(), f = ac.createBiquadFilter();
+    o.type = "sawtooth"; o.frequency.setValueAtTime(60, t); o.frequency.exponentialRampToValueAtTime(900, t + dur);
+    f.type = "lowpass"; f.frequency.setValueAtTime(200, t); f.frequency.exponentialRampToValueAtTime(5000, t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.25, t + dur); g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.1);
+    o.connect(f).connect(g).connect(master); o.start(t); o.stop(t + dur + 0.2);
+  },
+  crackle(dur = 8) { // quark plasma: random pops
+    const t0 = ac.currentTime;
+    for (let i = 0; i < dur * 14; i++) {
+      const t = t0 + Math.random() * dur, o = ac.createOscillator(), g = ac.createGain();
+      o.type = "square"; o.frequency.value = 200 + Math.random() * 2400; env(g, t, 0.002, 0.06, 0.05);
+      o.connect(g).connect(master); o.start(t); o.stop(t + 0.1);
+    }
+  },
+  shimmer() { // first light: bright chord swell
+    const t = ac.currentTime;
+    [523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((f, i) => {
+      const o = ac.createOscillator(), g = ac.createGain(); o.type = "sine"; o.frequency.value = f;
+      env(g, t + i * 0.12, 1.8, 0.12, 4); o.connect(g).connect(master); o.start(t); o.stop(t + 7);
+    });
+  },
+  ignite() { // star birth: whoosh + ping
+    const t = ac.currentTime, n = ac.createBufferSource(); n.buffer = noiseBuf(1.5);
+    const f = ac.createBiquadFilter(); f.type = "bandpass"; f.Q.value = 3; f.frequency.setValueAtTime(300, t); f.frequency.exponentialRampToValueAtTime(4000, t + 1);
+    const g = ac.createGain(); env(g, t, 0.3, 0.35, 1.1); n.connect(f).connect(g).connect(master); n.start(t);
+    const o = ac.createOscillator(), og = ac.createGain(); o.frequency.value = 1760 + Math.random() * 600; env(og, t + 0.9, 0.01, 0.12, 0.8);
+    o.connect(og).connect(master); o.start(t + 0.9); o.stop(t + 2);
+  },
+  choir() { // final swell
+    const t = ac.currentTime;
+    [110, 165, 220, 277.2, 330].forEach(f => {
+      const o = ac.createOscillator(), g = ac.createGain(); o.type = "triangle"; o.frequency.value = f;
+      env(g, t, 4, 0.16, 6); o.connect(g).connect(master); o.start(t); o.stop(t + 10.5);
+    });
+  }
+};
+/* One-shot cues keyed by timeline second */
+const CUES = [
+  { t:0.2, fn:() => SFX.riser(7.8) },
+  { t:8.0, fn:() => SFX.boom() },
+  { t:18.0, fn:() => SFX.crackle(11) },
+  { t:30.0, fn:() => SFX.shimmer() },
+  { t:41.0, fn:() => SFX.ignite() }, { t:44.5, fn:() => SFX.ignite() }, { t:47.5, fn:() => SFX.ignite() },
+  { t:50.2, fn:() => SFX.choir() }
+];
+
+/* ---------- Visuals ---------- */
+const cv = document.getElementById("c"), ctx = cv.getContext("2d");
+let W, H, DPR;
+function resize() { DPR = Math.min(devicePixelRatio || 1, 2); W = innerWidth; H = innerHeight; cv.width = W * DPR; cv.height = H * DPR; ctx.setTransform(DPR, 0, 0, DPR, 0, 0); }
+addEventListener("resize", resize); resize();
+
+const rnd = (a, b) => a + Math.random() * (b - a);
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const smooth = x => x * x * (3 - 2 * x);
+const prog = (t, a, b) => clamp((t - a) / (b - a));
+
+/* Deterministic-ish particle pools */
+const N = 420;
+const P = Array.from({ length: N }, (_, i) => ({
+  a: rnd(0, 6.283), r: Math.pow(Math.random(), 0.6), sp: rnd(0.2, 1) * (Math.random() < .5 ? -1 : 1),
+  sz: rnd(0.6, 2.6), hue: [190, 210, 280, 35][i % 4], arm: i % 3, d: Math.pow(Math.random(), 0.85)
+}));
+const STARS = Array.from({ length: 220 }, () => ({ x: Math.random(), y: Math.random(), z: rnd(.2, 1), tw: rnd(0, 6.28) }));
+const WEB = Array.from({ length: 46 }, () => ({ a: rnd(0, 6.283), d: rnd(.1, 1), ph: rnd(0, 6.28) }));
+const FLARES = [[.3,.35],[.68,.3],[.5,.7],[.2,.65],[.8,.68]].map(([x, y], i) => ({ x, y, t0: 41 + i * 1.7 }));
+
+function frame(t, now) {
+  const cx = W / 2, cy = H / 2, R = Math.min(W, H);
+  ctx.globalCompositeOperation = "source-over";
+  ctx.fillStyle = "#030308"; ctx.fillRect(0, 0, W, H);
+
+  /* background stars, fade in after first light */
+  const bgA = smooth(prog(t, 8, 14)) * 0.8;
+  if (bgA > 0) STARS.forEach(s => {
+    const k = 1 + prog(t, 8, 60) * 0.4 * s.z;
+    const x = cx + (s.x - .5) * W * k, y = cy + (s.y - .5) * H * k;
+    ctx.globalAlpha = bgA * (0.4 + 0.6 * Math.sin(now / 600 + s.tw) ** 2) * s.z;
+    ctx.fillStyle = "#fff"; ctx.fillRect(x, y, s.z * 1.6, s.z * 1.6);
+  });
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = "lighter";
+
+  /* ---- Stage 1: singularity (0–8s) ---- */
+  if (t < 9) {
+    const k = prog(t, 0, 8), fade = 1 - smooth(prog(t, 8, 9));
+    const r = (4 + k * 14 + Math.sin(now / 90) * 2 * k) * (1 - 0) ;
+    const jx = (Math.random() - .5) * 6 * k, jy = (Math.random() - .5) * 6 * k;
+    const g = ctx.createRadialGradient(cx + jx, cy + jy, 0, cx + jx, cy + jy, r * 8 + 20);
+    g.addColorStop(0, `rgba(255,255,255,${fade})`); g.addColorStop(.2, `rgba(125,211,252,${.7 * fade})`); g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx + jx, cy + jy, r * 8 + 20, 0, 6.283); ctx.fill();
+    // quantum foam sparks pulled inward
+    P.forEach((p, i) => {
+      if (i > 220) return;
+      const rad = (1 - ((now / 1800 * (0.4 + p.r) + p.r) % 1)) * R * 0.45 * (1 - k * .5);
+      const x = cx + Math.cos(p.a + now / 1500 * p.sp) * rad, y = cy + Math.sin(p.a + now / 1500 * p.sp) * rad;
+      ctx.fillStyle = `hsla(${p.hue},90%,70%,${(.5 * fade) * (1 - rad / (R * .45))})`; ctx.fillRect(x, y, p.sz, p.sz);
+    });
+  }
+
+  /* ---- Stage 2: Big Bang (8–18s) ---- */
+  if (t >= 8 && t < 22) {
+    const k = prog(t, 8, 18), fade = 1 - smooth(prog(t, 18, 22));
+    const flash = Math.exp(-(t - 8) * 3) ;
+    if (flash > .01) { ctx.fillStyle = `rgba(255,255,255,${clamp(flash)})`; ctx.fillRect(0, 0, W, H); }
+    // expanding shockwave rings
+    for (let i = 0; i < 4; i++) {
+      const kk = clamp((t - 8 - i * .35) / 6); if (kk <= 0) continue;
+      ctx.strokeStyle = `hsla(${200 + i * 25},90%,65%,${(1 - kk) * .7 * fade})`; ctx.lineWidth = 3 + (1 - kk) * 8;
+      ctx.beginPath(); ctx.arc(cx, cy, smooth(kk) * R * 0.9, 0, 6.283); ctx.stroke();
+    }
+    // inflation: particles race outward, exponential ease
+    const ex = Math.pow(prog(t, 8, 15), 0.45);
+    P.forEach(p => {
+      const rad = ex * R * (0.15 + p.r * 0.85);
+      const x = cx + Math.cos(p.a) * rad, y = cy + Math.sin(p.a) * rad;
+      ctx.fillStyle = `hsla(${p.hue},90%,65%,${.8 * fade})`;
+      const tr = rad * 0.06; ctx.fillRect(x, y, p.sz + tr * .02, p.sz + tr * .02);
+      ctx.strokeStyle = `hsla(${p.hue},90%,65%,${.15 * fade})`; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(cx + Math.cos(p.a) * rad * .9, cy + Math.sin(p.a) * rad * .9); ctx.stroke();
+    });
+  }
+
+  /* ---- Stage 3: quark soup (18–30s) ---- */
+  if (t >= 18 && t < 33) {
+    const a = smooth(prog(t, 18, 20)) * (1 - smooth(prog(t, 30, 33)));
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * .7);
+    g.addColorStop(0, `rgba(251,146,60,${.35 * a})`); g.addColorStop(.6, `rgba(190,60,90,${.15 * a})`); g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    const cool = prog(t, 18, 30);
+    P.forEach((p, i) => {
+      const w = now / 700 * p.sp + p.a * 3;
+      const rad = (.12 + p.r * .5) * R * (1 + .12 * Math.sin(now / 500 + i));
+      const x = cx + Math.cos(w + p.a) * rad + Math.sin(now / 130 + i) * 3, y = cy + Math.sin(w * 1.1 + p.a) * rad * .8 + Math.cos(now / 110 + i) * 3;
+      const hue = 20 + p.hue * 0.2 + cool * 120; // orange → cyan as it cools
+      ctx.fillStyle = `hsla(${hue},95%,${60 + p.r * 15}%,${.85 * a})`;
+      ctx.beginPath(); ctx.arc(x, y, p.sz * (p.arm === 0 ? 1.6 : 1), 0, 6.283); ctx.fill();
+    });
+    // annihilation flashes
+    if (Math.random() < .35 * a) {
+      const x = cx + rnd(-.4, .4) * R, y = cy + rnd(-.3, .3) * R, g2 = ctx.createRadialGradient(x, y, 0, x, y, 28);
+      g2.addColorStop(0, `rgba(255,255,255,${.9 * a})`); g2.addColorStop(1, "rgba(255,255,255,0)"); ctx.fillStyle = g2; ctx.fillRect(x - 28, y - 28, 56, 56);
+    }
+  }
+
+  /* ---- Stage 4: first light / CMB (30–40s, lingers) ---- */
+  if (t >= 30) {
+    const a = smooth(prog(t, 30, 33)) * (1 - smooth(prog(t, 40, 46)) * .8);
+    const pulse = smooth(prog(t, 30, 36));
+    for (let i = 0; i < 90; i++) { // mottled CMB blobs
+      const aa = i * 2.399, rr = Math.sqrt(i / 90) * R * .55 * (0.4 + pulse * .8);
+      const x = cx + Math.cos(aa) * rr, y = cy + Math.sin(aa) * rr * .75;
+      const hue = (Math.sin(i * 1.7 + now / 3000) * 60 + 240 + 360) % 360, rad = 30 + (i % 7) * 10;
+      const g = ctx.createRadialGradient(x, y, 0, x, y, rad);
+      g.addColorStop(0, `hsla(${hue},80%,60%,${.16 * a})`); g.addColorStop(1, "rgba(0,0,0,0)"); ctx.fillStyle = g; ctx.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+    }
+    // photon streaks
+    for (let i = 0; i < 36; i++) {
+      const aa = i / 36 * 6.283 + now / 9000, k2 = ((now / 1200 + i * .37) % 1);
+      ctx.strokeStyle = `rgba(255,240,200,${.5 * a * (1 - k2)})`; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(cx + Math.cos(aa) * k2 * R * .8, cy + Math.sin(aa) * k2 * R * .8);
+      ctx.lineTo(cx + Math.cos(aa) * (k2 + .05) * R * .8, cy + Math.sin(aa) * (k2 + .05) * R * .8); ctx.stroke();
+    }
+  }
+
+  /* ---- Stage 5: cosmic web + first stars (40–50s onward) ---- */
+  if (t >= 40) {
+    const a = smooth(prog(t, 40, 43));
+    ctx.lineWidth = 1;
+    WEB.forEach((n, i) => {
+      const x = cx + Math.cos(n.a + now / 20000) * n.d * R * .75, y = cy + Math.sin(n.a + now / 20000) * n.d * R * .5;
+      n.x = x; n.y = y;
+    });
+    WEB.forEach((n, i) => WEB.forEach((m, j) => {
+      if (j <= i) return; const d = Math.hypot(n.x - m.x, n.y - m.y);
+      if (d < R * .22) { ctx.strokeStyle = `rgba(129,140,248,${(1 - d / (R * .22)) * .35 * a})`; ctx.beginPath(); ctx.moveTo(n.x, n.y); ctx.lineTo(m.x, m.y); ctx.stroke(); }
+    }));
+    WEB.forEach(n => { ctx.fillStyle = `rgba(165,180,252,${.5 * a})`; ctx.beginPath(); ctx.arc(n.x, n.y, 2.5, 0, 6.283); ctx.fill(); });
+    FLARES.forEach(f => {
+      const k = clamp((t - f.t0) / 3); if (k <= 0) return;
+      const r2 = (20 + 60 * Math.sin(k * 3.14) + 30 * k) * (R / 900 + .3), x = f.x * W, y = f.y * H;
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r2);
+      g.addColorStop(0, "rgba(255,255,255,.95)"); g.addColorStop(.2, "rgba(147,197,253,.6)"); g.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = g; ctx.fillRect(x - r2, y - r2, r2 * 2, r2 * 2);
+    });
+  }
+
+  /* ---- Stage 6: spiral galaxies (50–60s) ---- */
+  if (t >= 50) {
+    const a = smooth(prog(t, 50, 54)), zoom = .5 + .5 * smooth(prog(t, 50, 60));
+    const gx = cx, gy = cy, spin = now / 14000;
+    P.forEach((p, i) => {
+      const rr = (.05 + p.d * .5) * R * zoom, ang = p.arm * 2.094 + p.d * 5.5 + spin * (1.2 - p.d * .6);
+      const x = gx + Math.cos(ang) * rr + rnd(-3, 3), y = gy + Math.sin(ang) * rr * .55 + rnd(-3, 3);
+      const hue = p.d < .25 ? 40 : 215 + p.hue * .2;
+      ctx.fillStyle = `hsla(${hue},85%,${70 - p.d * 20}%,${.85 * a})`; ctx.beginPath(); ctx.arc(x, y, p.sz * (1.4 - p.d * .6), 0, 6.283); ctx.fill();
+    });
+    const g = ctx.createRadialGradient(gx, gy, 0, gx, gy, R * .14 * zoom);
+    g.addColorStop(0, `rgba(255,236,179,${.9 * a})`); g.addColorStop(1, "rgba(0,0,0,0)"); ctx.fillStyle = g; ctx.fillRect(gx - R * .2, gy - R * .2, R * .4, R * .4);
+    // distant galaxies
+    [[.2,.25,.8],[.82,.3,1.1],[.78,.78,.7],[.15,.75,.9]].forEach(([x, y, s], i) => {
+      ctx.save(); ctx.translate(x * W, y * H); ctx.rotate(.7 * i + spin); ctx.scale(1, .45);
+      const gg = ctx.createRadialGradient(0, 0, 0, 0, 0, 55 * s); gg.addColorStop(0, `rgba(220,230,255,${.7 * a})`); gg.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = gg; ctx.fillRect(-60 * s, -60 * s, 120 * s, 120 * s); ctx.restore();
+    });
+  }
+  ctx.globalCompositeOperation = "source-over";
+}
+
+/* ---------- Player / sync ---------- */
+const $ = id => document.getElementById(id);
+let t = 0, playing = false, last = 0, stageIdx = -1, firedUpTo = -1;
+function stageAt(x) { return STAGES.findIndex(s => x >= s.s && x < s.e); }
+
+function setStage(i) {
+  if (i === stageIdx) return; stageIdx = i; const s = STAGES[i]; if (!s) return;
+  $("stage").textContent = `STAGE 0${i + 1} // ${fmt(s.s)} – ${fmt(Math.min(s.e, 60))}`;
+  $("title").textContent = s.title; $("sub").textContent = s.sub; $("hT").textContent = s.temp; $("hS").textContent = s.scale;
+}
+const fmt = x => `00:${String(Math.floor(x)).padStart(2, "0")}`;
+
+function syncVoice(seek) {
+  const i = stageAt(t); voices.forEach((v, k) => { if (k !== i) { v.pause(); } });
+  if (i < 0 || !playing || muted) return;
+  const v = voices[i], off = t - (STAGES[i].s + NARR_OFFSET);
+  if (off < 0) { v.pause(); return; }
+  if (seek || Math.abs(v.currentTime - off) > 0.6) { try { v.currentTime = off; } catch (e) {} }
+  if (v.paused && !(v.duration && off > v.duration)) v.play().catch(() => {});
+}
+function fireCues(from, to) { if (!ac || muted) return; CUES.forEach(c => { if (c.t > from && c.t <= to) c.fn(); }); }
+
+function setPlaying(p) {
+  playing = p; $("play").textContent = p ? "❚❚" : "▶";
+  if (ac) { p ? ac.resume() : ac.suspend(); }
+  if (!p) voices.forEach(v => v.pause()); else syncVoice(true);
+  last = performance.now();
+}
+function seek(x) {
+  t = clamp(x, 0, DURATION); firedUpTo = t;
+  // restart riser if scrubbing into the intro; otherwise sfx resume from next cue
+  syncVoice(true);
+}
+function tick(now) {
+  const dt = Math.min((now - last) / 1000, .1); last = now;
+  if (playing) {
+    const prev = t; t += dt;
+    if (t >= DURATION) { t = DURATION; setPlaying(false); }
+    fireCues(prev, t);
+    if (droneGain) { // drone evolves with the story
+      const k = t / 60; droneGain.gain.setTargetAtTime(muted ? 0 : (.18 + .1 * Math.sin(k * 6)) * (t < 8 ? .6 + t / 20 : 1), ac.currentTime, .5);
+      droneFilter.frequency.setTargetAtTime(150 + 900 * smooth(prog(t, 8, 30)) + 600 * smooth(prog(t, 40, 55)), ac.currentTime, .5);
+    }
+    syncVoice(false);
+  }
+  setStage(Math.max(0, stageAt(t)));
+  $("scrub").value = t; $("time").textContent = `${t.toFixed(1).padStart(4, "0")} / 60`;
+  frame(t, now);
+  requestAnimationFrame(tick);
+}
+
+$("go").onclick = () => { initAudio(); $("start").remove(); t = 0; setPlaying(true); fireCues(-1, 0.25); };
+$("play").onclick = () => { initAudio(); if (t >= DURATION) seek(0); setPlaying(!playing); };
+$("restart").onclick = () => { initAudio(); seek(0); fireCues(-1, 0.25); setPlaying(true); };
+$("mute").onclick = () => { muted = !muted; $("mute").textContent = muted ? "🔇 OFF" : "🔊 ON"; if (master) master.gain.value = muted ? 0 : .8; voices.forEach(v => v.muted = muted); if (!muted) syncVoice(true); };
+$("scrub").oninput = e => seek(+e.target.value);
+addEventListener("keydown", e => { if (e.code === "Space" && !$("start").isConnected) { e.preventDefault(); $("play").click(); } });
+requestAnimationFrame(now => { last = now; tick(now); });
+</script>
+</body>
+</html>
